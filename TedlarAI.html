@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trade Show Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f4f6f8;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      color: #333;
+    }
+    .card {
+      background-color: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 16px 24px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    .card-header h2 {
+      margin: 0;
+      font-size: 1.25rem;
+      color: #222;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .card-header .date {
+      font-weight: 400;
+      font-size: 0.9rem;
+      color: #666;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 12px 16px;
+      text-align: left;
+    }
+    thead {
+      background-color: #fafafa;
+      border-bottom: 2px solid #e0e0e0;
+    }
+    th {
+      font-weight: 600;
+      color: #555;
+    }
+    tr.company-row {
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+    tr.company-row:hover {
+      background-color: #f0f4f8;
+    }
+    .expand-icon {
+      display: inline-block;
+      margin-right: 8px;
+      transition: transform 0.3s ease;
+      color: #007bff;
+      font-weight: 600;
+    }
+    tr.company-row.expanded .expand-icon {
+      transform: rotate(90deg);
+    }
+    tr.lead-row td {
+      background-color: #f9fbfd;
+      padding-left: 48px;
+    }
+    ul.lead-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .lead-item {
+      display: flex;
+      align-items: center;
+      margin: 8px 0;
+    }
+    .lead-name {
+      flex: 1;
+      font-weight: 500;
+      color: #333;
+    }
+    .lead-actions button {
+      background: none;
+      border: none;
+      color: #007bff;
+      cursor: pointer;
+      font-weight: 500;
+      margin-left: 16px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: background-color 0.2s;
+    }
+    .lead-actions button:hover {
+      background-color: rgba(0, 123, 255, 0.1);
+    }
+  </style>
+</head>
+<body>
+  <h1>Trade Show Dashboard</h1>
+  <div id="dashboard"></div>
+  <script>
+    const noteTemplate = name => `Hi ${name},
+
+I hope you’re doing well. I’m Keyan O’Donnell from DuPont's Tedlar group - we're looking for new businesses with which to partner with so your team can focus on making beautiful graphics, not replacing them.
+
+Our product is best in class for chemical and UV resistance and is even graffiti-proof.
+
+Could we schedule a 15 minute call next week to explore how Tedlar can deliver high-quality coatings for your advertisements?
+
+Looking forward to connecting,
+
+Keyan O’Donnell
+Tedlar Group, DuPont
+keyan@DuPont.com | (123) 456-7890`;
+
+    function loadCSV(path, header) {
+      return new Promise((resolve, reject) => {
+        Papa.parse(path, {
+          download: true,
+          header: header,
+          complete: results => resolve(results.data),
+          error: err => reject(err)
+        });
+      });
+    }
+
+    Promise.all([
+      loadCSV('src/lead_generation/data/caprank.csv', true),
+      loadCSV('src/lead_management/data/lead_info.csv', false)
+    ]).then(([capRows, leadRows]) => {
+      const eventsMap = {};
+      capRows.forEach(row => {
+        const event = row['Trade Show'];
+        if (!eventsMap[event]) eventsMap[event] = [];
+        eventsMap[event].push(row);
+      });
+
+      const leadsMap = {};
+      leadRows.forEach(row => {
+        const company = row[0];
+        const leads = [];
+        for (let i = 1; i < row.length; i += 2) {
+          const name = row[i];
+          const link = row[i + 1];
+          if (name && link) leads.push({ name: name, link: link });
+        }
+        leadsMap[company] = leads;
+      });
+
+      const dashboard = document.getElementById('dashboard');
+      Object.keys(eventsMap).forEach(event => {
+        const rows = eventsMap[event];
+        const card = document.createElement('div'); card.className = 'card';
+
+        const header = document.createElement('div'); header.className = 'card-header';
+        const title = document.createElement('h2');
+        const date = rows[0]['Dates'] || '';
+        title.innerHTML = event + (date ? ` <span class="date">(${date})</span>` : '');
+        header.appendChild(title);
+        card.appendChild(header);
+
+        const table = document.createElement('table');
+        const thead = document.createElement('thead');
+        thead.innerHTML = '<tr><th>Company</th><th>Market Cap</th><th>Revenue</th></tr>';
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+        rows.forEach(row => {
+          const company = row['Company Name'];
+          const compRow = document.createElement('tr');
+          compRow.className = 'company-row';
+          compRow.dataset.company = company;
+          compRow.innerHTML = `<td><span class="expand-icon">▶</span>${company}</td><td>${row['Market Cap']}</td><td>${row['Revenue']}</td>`;
+          tbody.appendChild(compRow);
+
+          const leadRow = document.createElement('tr'); leadRow.className = 'lead-row'; leadRow.style.display = 'none';
+          const td = document.createElement('td'); td.colSpan = 3;
+          const ul = document.createElement('ul'); ul.className = 'lead-list';
+
+          (leadsMap[company] || []).forEach(lead => {
+            const li = document.createElement('li');
+            li.className = 'lead-item';
+            const firstName = lead.name.split(' ')[0];
+            li.innerHTML = `
+              <span class="lead-name">${lead.name}</span>
+              <span class="lead-actions">
+                <button onclick="navigator.clipboard.writeText(noteTemplate('${firstName}'))">Copy Note</button>
+                <button onclick="window.open('${lead.link}','_blank')">View LinkedIn</button>
+              </span>
+            `;
+            ul.appendChild(li);
+          });
+
+          td.appendChild(ul); leadRow.appendChild(td);
+          tbody.appendChild(leadRow);
+        });
+
+        table.appendChild(tbody); card.appendChild(table);
+        dashboard.appendChild(card);
+      });
+
+      document.querySelectorAll('tr.company-row').forEach(row => {
+        row.addEventListener('click', () => {
+          const leadRow = row.nextElementSibling;
+          if (leadRow.style.display === 'none') {
+            leadRow.style.display = 'table-row'; row.classList.add('expanded');
+          } else {
+            leadRow.style.display = 'none'; row.classList.remove('expanded');
+          }
+        });
+      });
+    }).catch(err => console.error('Error loading CSVs:', err));
+  </script>
+</body>
+</html>
