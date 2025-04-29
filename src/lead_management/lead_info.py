@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import time
 import random
+import re
 from urllib.parse import urlparse
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
@@ -54,6 +55,7 @@ def clean_linkedin_url(raw_url):
 
 
 def clean_name_from_url(url):
+    # 1) extract the slug
     if '/in/' in url:
         slug = url.split('/in/')[-1]
     elif '/pub/' in url:
@@ -61,11 +63,30 @@ def clean_name_from_url(url):
     else:
         return "Unknown"
 
+    # 2) drop any trailing path bits
     slug = slug.split('/')[0]
+
+    # 3) split on hyphens
     parts = slug.split('-')
-    if len(parts) > 1 and parts[-1].isalnum():
-        parts = parts[:-1]
-    return ' '.join(parts).title().replace('-', ' ')
+
+    # 4) if the last part has more than 2 digits, drop it
+    if len(parts) > 1:
+        last = parts[-1]
+        if sum(c.isdigit() for c in last) > 2:
+            parts = parts[:-1]
+
+    # 5) for single-part slugs, strip off any trailing digits
+    if len(parts) == 1:
+        parts[0] = re.sub(r'\d+$', '', parts[0])
+
+    # 6) remove any remaining digits from each part
+    parts = [re.sub(r'\d+', '', p) for p in parts]
+
+    # 7) filter out any empty strings
+    parts = [p for p in parts if p]
+
+    # 8) join and title-case
+    return ' '.join(parts).title()
 
 
 def search_company_leads(driver, company_name, max_results=10):
